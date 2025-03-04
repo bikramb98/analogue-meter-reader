@@ -1,6 +1,10 @@
 import cv2
 import numpy as np
 import math
+import pandas as pd
+
+angle_list = []
+value_list = []
 
 def read_pressure_gauge_advanced(frame, min_value=0, max_value=30, 
                                 min_angle=225, max_angle=315, debug=False):
@@ -19,6 +23,10 @@ def read_pressure_gauge_advanced(frame, min_value=0, max_value=30,
     Returns:
         float: The value where the needle is pointing
     """
+
+    # angle_list = []
+    # value_list = []
+
     # Read the image
     img = frame
     if img is None:
@@ -106,10 +114,6 @@ def read_pressure_gauge_advanced(frame, min_value=0, max_value=30,
     if lines is None or len(lines) == 0:
         raise ValueError("No lines detected that could be the needle")
     
-    # Find which line is most likely to be the needle
-    best_line = None
-    best_score = 0
-    
 # Find which line is most likely to be the needle
     best_line = None
     best_score = 0
@@ -117,38 +121,34 @@ def read_pressure_gauge_advanced(frame, min_value=0, max_value=30,
     for line in lines:
         x1, y1, x2, y2 = line[0]
         
-        # Calculate distances from both points to center
+        # Determine which end is closer to the center
         d1 = np.sqrt((x1 - center_x)**2 + (y1 - center_y)**2)
         d2 = np.sqrt((x2 - center_x)**2 + (y2 - center_y)**2)
         
-        # Calculate total line length
-        line_length = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
-
-        # print(f"line length: {line_length}")
-
-        if line_length > 140:
+        if d1 < d2:
+            pivot_x, pivot_y = x1, y1
+            needle_x, needle_y = x2, y2
+        else:
+            pivot_x, pivot_y = x2, y2
+            needle_x, needle_y = x1, y1
         
-            # Check both possible orientations of the line
-            # First orientation: point 1 as pivot
-            if d1 < radius * 0.3:  # Point 1 is near center
-                score1 = d2 * (1 - d1/radius)  # Higher score for longer needle and closer pivot
-            else:
-                score1 = 0
+        # The pivot should be close to the center, and the tip should be near the edge
+        if d1 < radius * 0.3 or d2 < radius * 0.3:
+            # Calculate line length
+            line_length = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+            
+            if line_length > 90:
+
+                print(f"line length: {line_length}")
+            
+                # Higher score for longer lines with one end near center
+                score = line_length * (1 - min(d1, d2) / radius)
                 
-            # Second orientation: point 2 as pivot
-            if d2 < radius * 0.3:  # Point 2 is near center
-                score2 = d1 * (1 - d2/radius)  # Higher score for longer needle and closer pivot
-            else:
-                score2 = 0
-                
-            # Use the better orientation
-            if score1 > score2 and score1 > best_score:
-                best_score = score1
-                best_line = [x1, y1, x2, y2]  # pivot is point 1
-            elif score2 > score1 and score2 > best_score:
-                best_score = score2
-                best_line = [x2, y2, x1, y1]  # pivot is point 2
-        
+                if score > best_score:
+                    best_score = score
+                    best_line = [pivot_x, pivot_y, needle_x, needle_y]
+                    print("best line detected")
+    
     if best_line is None:
         raise ValueError("Could not identify the needle")
     
@@ -165,13 +165,22 @@ def read_pressure_gauge_advanced(frame, min_value=0, max_value=30,
     angle_rad = math.atan2(dy, dx)
     angle_deg = math.degrees(angle_rad)
 
-    
+    converted = False
     
     # Adjust angle to be in 0-360 range
-    if angle_deg < 0:
+    # if angle_deg < 0 and angle_deg < -48:
+
+    #     converted = True
+
+    #     angle_deg += 360
+
+    # Adjust angle to be in 0-360 range
+    if angle_deg < -48:
         angle_deg += 360
 
     # print(f"angle degrres: {angle_deg}")
+
+    angle_list.append(angle_deg)
 
     first_reading_val = 0
     first_reading_angle = 225
@@ -182,10 +191,18 @@ def read_pressure_gauge_advanced(frame, min_value=0, max_value=30,
 
     # print(degree_per_val)
 
-    # value = (10/89)*(225-angle_deg)
-
     value = ((second_reading_val-first_reading_val)/(first_reading_angle-second_reading_angle))*(first_reading_angle-angle_deg)
-    
+
+    value_list.append(value)
+
+    if converted == True:
+
+        print(f"angle converted: {converted}, value = {value}")
+
+    else:
+
+        print(f"angle : {angle_deg}, value = {value}")
+
     # Calculate gauge value based on angle
     # Handle the case where min_angle > max_angle (gauge wraps around)
     # if min_angle > max_angle:
@@ -252,7 +269,7 @@ def read_pressure_gauge_advanced(frame, min_value=0, max_value=30,
 
         # print("---")
     
-    return value
+    return value, angle_list, value_list
 
 # def main():
     # Example usage
@@ -296,7 +313,7 @@ def read_pressure_gauge_advanced(frame, min_value=0, max_value=30,
 
 def main():
     # Video capture setup
-    cap = cv2.VideoCapture('mergedfile.mp4')
+    cap = cv2.VideoCapture('record2.mp4')
     if not cap.isOpened():
         print("Error: Could not open video file")
         return
@@ -308,7 +325,7 @@ def main():
             break
 
         try:
-            value = read_pressure_gauge_advanced(
+            value, angle_list, value_list = read_pressure_gauge_advanced(
                 frame,
                 min_value=0,
                 max_value=30,
@@ -327,6 +344,15 @@ def main():
     # Cleanup
     cap.release()
     cv2.destroyAllWindows()
+
+    print(angle_list)
+    print(value_list)
+    print(len(value_list))
+
+    df = pd.DataFrame()
+    df['angle'] = angle_list
+    df['value'] = value_list
+    df.to_csv('debug_df.csv')
 
 if __name__ == "__main__":
     main()
