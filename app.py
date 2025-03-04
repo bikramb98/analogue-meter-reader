@@ -9,11 +9,13 @@ import plotly.graph_objects as go
 
 def update_plot(data, placeholder):
     df_all = pd.DataFrame(data)
+    marker_colors = ['red' if val > 25 else 'blue' for val in df_all["Meter Reading"]]
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=list(range(len(df_all))),
         y=df_all["Meter Reading"],
         mode='lines+markers',
+        marker=dict(color=marker_colors),
         name='Meter Reading'
     ))
     fig.update_layout(
