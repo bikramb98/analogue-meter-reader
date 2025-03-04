@@ -53,7 +53,7 @@ def read_pressure_gauge_advanced(frame, min_value=0, max_value=30,
     circle = circles[0][0]  # Get the first and presumably largest circle
     center_x, center_y, radius = circle
 
-    print(f"radius: {radius}")
+    # print(f"radius: {radius}")
     
     if debug:
         # Draw the detected circle
@@ -67,17 +67,17 @@ def read_pressure_gauge_advanced(frame, min_value=0, max_value=30,
     # Apply a threshold to detect the needle (darker than background)
     _, thresh = cv2.threshold(blurred, 100, 255, cv2.THRESH_BINARY_INV)
 
-    if debug:
-        cv2.imshow("threshold", thresh)
-        cv2.waitKey(1)
+    # if debug:
+    # cv2.imshow("threshold", thresh)
+    # cv2.waitKey(1)
     
     # Apply Canny edge detection with the mask
     edges = cv2.Canny(thresh, 50, 150)
     edges = cv2.bitwise_and(edges, edges, mask=mask)
     
-    if debug:
-        cv2.imshow("Edges", edges)
-        cv2.waitKey(1)
+    # if debug:
+    #     cv2.imshow("Edges", edges)
+    #     cv2.waitKey(1)
     
     # Find lines using Hough Line Transform
     lines = cv2.HoughLinesP(
@@ -88,6 +88,20 @@ def read_pressure_gauge_advanced(frame, min_value=0, max_value=30,
         minLineLength=int(radius * 0.3),  # Needle should be a significant portion of radius
         maxLineGap=10
     )
+
+    # print(len(lines))
+
+    # Create a copy of the original image for line visualization
+    # all_lines_img = img.copy()
+    
+    # Draw all detected lines in blue
+    # for line in lines:
+    #     x1, y1, x2, y2 = line[0]
+    #     cv2.line(all_lines_img, (x1, y1), (x2, y2), (255, 0, 0), 2)
+    
+    # Show the image with all detected lines
+    # cv2.imshow("All Detected Lines", all_lines_img)
+    # cv2.waitKey(1)
     
     if lines is None or len(lines) == 0:
         raise ValueError("No lines detected that could be the needle")
@@ -96,32 +110,45 @@ def read_pressure_gauge_advanced(frame, min_value=0, max_value=30,
     best_line = None
     best_score = 0
     
+# Find which line is most likely to be the needle
+    best_line = None
+    best_score = 0
+    
     for line in lines:
         x1, y1, x2, y2 = line[0]
         
-        # Determine which end is closer to the center
+        # Calculate distances from both points to center
         d1 = np.sqrt((x1 - center_x)**2 + (y1 - center_y)**2)
         d2 = np.sqrt((x2 - center_x)**2 + (y2 - center_y)**2)
         
-        if d1 < d2:
-            pivot_x, pivot_y = x1, y1
-            needle_x, needle_y = x2, y2
-        else:
-            pivot_x, pivot_y = x2, y2
-            needle_x, needle_y = x1, y1
+        # Calculate total line length
+        line_length = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+
+        # print(f"line length: {line_length}")
+
+        if line_length > 140:
         
-        # The pivot should be close to the center, and the tip should be near the edge
-        if d1 < radius * 0.3 or d2 < radius * 0.3:
-            # Calculate line length
-            line_length = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
-            
-            # Higher score for longer lines with one end near center
-            score = line_length * (1 - min(d1, d2) / radius)
-            
-            if score > best_score:
-                best_score = score
-                best_line = [pivot_x, pivot_y, needle_x, needle_y]
-    
+            # Check both possible orientations of the line
+            # First orientation: point 1 as pivot
+            if d1 < radius * 0.3:  # Point 1 is near center
+                score1 = d2 * (1 - d1/radius)  # Higher score for longer needle and closer pivot
+            else:
+                score1 = 0
+                
+            # Second orientation: point 2 as pivot
+            if d2 < radius * 0.3:  # Point 2 is near center
+                score2 = d1 * (1 - d2/radius)  # Higher score for longer needle and closer pivot
+            else:
+                score2 = 0
+                
+            # Use the better orientation
+            if score1 > score2 and score1 > best_score:
+                best_score = score1
+                best_line = [x1, y1, x2, y2]  # pivot is point 1
+            elif score2 > score1 and score2 > best_score:
+                best_score = score2
+                best_line = [x2, y2, x1, y1]  # pivot is point 2
+        
     if best_line is None:
         raise ValueError("Could not identify the needle")
     
@@ -144,7 +171,7 @@ def read_pressure_gauge_advanced(frame, min_value=0, max_value=30,
     if angle_deg < 0:
         angle_deg += 360
 
-    print(f"angle degrres: {angle_deg}")
+    # print(f"angle degrres: {angle_deg}")
 
     first_reading_val = 0
     first_reading_angle = 225
@@ -223,7 +250,7 @@ def read_pressure_gauge_advanced(frame, min_value=0, max_value=30,
         cv2.waitKey(1)
         # cv2.destroyAllWindows()
 
-        print("---")
+        # print("---")
     
     return value
 
