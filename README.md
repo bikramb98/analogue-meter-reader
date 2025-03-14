@@ -5,7 +5,7 @@ A computer vision application that reads analog meter values in real-time using 
 ## Features
 
 - Real-time analog meter reading using computer vision
-- Live visualization of meter readings
+- Live visualisation of meter readings
 - Interactive plotting of readings over time
 - Configurable meter detection parameters
 
@@ -17,4 +17,4 @@ A computer vision application that reads analog meter values in real-time using 
 
 ## Configuration
 
-The application uses a configuration file (`config.yaml`) to define the parameters for meter detection. You can customize the parameters to improve the accuracy of the meter reading.
+The application uses a configuration file (`config.yaml`) to define the parameters for meter detection. You can customiSe the parameters to improve the accuracy of the meter reading and for different lighting conditions.
