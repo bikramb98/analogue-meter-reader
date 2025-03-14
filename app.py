@@ -6,10 +6,19 @@ import pandas as pd
 from io import BytesIO
 import math
 import plotly.graph_objects as go
+import yaml
+
+# Load configuration
+def load_config():
+    with open('config.yaml', 'r') as file:
+        return yaml.safe_load(file)
+
+# Load config at startup
+config = load_config()
 
 def update_plot(data, placeholder):
     df_all = pd.DataFrame(data)
-    marker_colors = ['red' if val > 25 else 'blue' for val in df_all["Meter Reading"]]
+    marker_colors = ['red' if val > config['anomaly_threshold'] else 'blue' for val in df_all["Meter Reading"]]
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=list(range(len(df_all))),
@@ -44,18 +53,20 @@ def process_frame(frame):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     
     # Apply GaussianBlur to reduce noise
-    blurred = cv2.GaussianBlur(gray, (11, 11), 0)
+    blur_config = config['gauge_detection']['gaussian_blur']
+    blurred = cv2.GaussianBlur(gray, tuple(blur_config['kernel_size']), blur_config['sigma'])
     
     # Detect circles (the gauge)
+    circle_config = config['gauge_detection']['hough_circles']
     circles = cv2.HoughCircles(
         blurred, 
         cv2.HOUGH_GRADIENT, 
-        dp=1, 
-        minDist=100, 
-        param1=50, 
-        param2=30, 
-        minRadius=180, 
-        maxRadius=205
+        dp=circle_config['dp'], 
+        minDist=circle_config['min_dist'], 
+        param1=circle_config['param1'], 
+        param2=circle_config['param2'], 
+        minRadius=circle_config['min_radius'], 
+        maxRadius=circle_config['max_radius']
     )
     
     if circles is None:
@@ -77,15 +88,17 @@ def process_frame(frame):
     mask = np.zeros_like(gray)
     cv2.circle(mask, (center_x, center_y), int(radius * 0.9), 255, -1)
     
-    # Apply a threshold to detect the needle (darker than background)
-    _, thresh = cv2.threshold(blurred, 100, 255, cv2.THRESH_BINARY_INV)
+    # Apply a threshold to detect the needle
+    needle_config = config['needle_detection']
+    _, thresh = cv2.threshold(blurred, needle_config['threshold_value'], 255, cv2.THRESH_BINARY_INV)
 
     # if debug:
     # cv2.imshow("threshold", thresh)
     # cv2.waitKey(1)
     
     # Apply Canny edge detection with the mask
-    edges = cv2.Canny(thresh, 50, 150)
+    canny_config = needle_config['canny_edge']
+    edges = cv2.Canny(thresh, canny_config['threshold1'], canny_config['threshold2'])
     edges = cv2.bitwise_and(edges, edges, mask=mask)
     
     # if debug:
@@ -93,13 +106,14 @@ def process_frame(frame):
     #     cv2.waitKey(1)
     
     # Find lines using Hough Line Transform
+    lines_config = needle_config['hough_lines']
     lines = cv2.HoughLinesP(
         edges, 
-        rho=1, 
-        theta=np.pi/180, 
-        threshold=30, 
-        minLineLength=int(radius * 0.3),  # Needle should be a significant portion of radius
-        maxLineGap=10
+        rho=lines_config['rho'], 
+        theta=np.pi/lines_config['theta_div'], 
+        threshold=lines_config['threshold'], 
+        minLineLength=int(radius * lines_config['min_line_length_ratio']),
+        maxLineGap=lines_config['max_line_gap']
     )
 
     # print(len(lines))
@@ -123,6 +137,9 @@ def process_frame(frame):
     best_line = None
     best_score = 0
     
+    center_proximity_ratio = config['gauge_calibration']['center_proximity_ratio']
+    min_line_length = config['gauge_calibration']['min_line_length']
+    
     for line in lines:
         x1, y1, x2, y2 = line[0]
         
@@ -138,11 +155,11 @@ def process_frame(frame):
             needle_x, needle_y = x1, y1
         
         # The pivot should be close to the center, and the tip should be near the edge
-        if d1 < radius * 0.3 or d2 < radius * 0.3:
+        if d1 < radius * center_proximity_ratio or d2 < radius * center_proximity_ratio:
             # Calculate line length
             line_length = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
             
-            if line_length > 90:
+            if line_length > min_line_length:
 
                 # print(f"line length: {line_length}")
             
@@ -190,16 +207,18 @@ def process_frame(frame):
 
         # angle_list.append(angle_deg)
 
-        first_reading_val = 0
-        first_reading_angle = 225
-        second_reading_val = 10
-        second_reading_angle = 136
+        # Get calibration values from config
+        cal_config = config['gauge_calibration']
+        first_reading_val = cal_config['first_reading']['value']
+        first_reading_angle = cal_config['first_reading']['angle']
+        second_reading_val = cal_config['second_reading']['value']
+        second_reading_angle = cal_config['second_reading']['angle']
 
-        degree_per_val = (first_reading_angle - second_reading_angle) / (second_reading_val - first_reading_val)
-
-        # print(degree_per_val)
-
-        value = np.abs(((second_reading_val-first_reading_val)/(first_reading_angle-second_reading_angle))*(first_reading_angle-angle_deg))
+        # Calculate value
+        value = np.abs(
+            ((second_reading_val-first_reading_val)/(first_reading_angle-second_reading_angle))
+            *(first_reading_angle-angle_deg)
+        )
 
         print(value)
 
