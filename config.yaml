@@ -1,0 +1,40 @@
+# Gauge Detection Parameters
+gauge_detection:
+  gaussian_blur:
+    kernel_size: [11, 11]
+    sigma: 0
+  hough_circles:
+    dp: 1
+    min_dist: 100
+    param1: 50
+    param2: 30
+    min_radius: 180
+    max_radius: 205
+
+# Needle Detection Parameters
+needle_detection:
+  threshold_value: 100
+  canny_edge:
+    threshold1: 50
+    threshold2: 150
+  hough_lines:
+    rho: 1
+    theta_div: 180  # Will be converted to np.pi/180
+    threshold: 30
+    min_line_length_ratio: 0.3  # Ratio of radius
+    max_line_gap: 10
+
+# Gauge Reading Calibration
+gauge_calibration:
+  # Calibration points for converting angle to value
+  first_reading:
+    value: 0
+    angle: 225
+  second_reading:
+    value: 10
+    angle: 136
+  
+  # Needle center proximity threshold (as ratio of radius)
+  center_proximity_ratio: 0.3
+  min_line_length: 90 
+anomaly_threshold: 25
