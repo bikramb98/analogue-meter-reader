@@ -199,7 +199,7 @@ def process_frame(frame):
 
         # print(degree_per_val)
 
-        value = ((second_reading_val-first_reading_val)/(first_reading_angle-second_reading_angle))*(first_reading_angle-angle_deg)
+        value = np.abs(((second_reading_val-first_reading_val)/(first_reading_angle-second_reading_angle))*(first_reading_angle-angle_deg))
 
         print(value)
 
