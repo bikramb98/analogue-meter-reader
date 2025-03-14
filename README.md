@@ -12,8 +12,8 @@ A computer vision application that reads analog meter values in real-time using 
 
 ## Quick Start
 
-1. Install dependencies: pip install -r requirements.txt
-2. Run the Streamlit app: streamlit run app.py
+1. Install dependencies: `pip install -r requirements.txt`
+2. Run the Streamlit app: `streamlit run app.py`
 
 ## Configuration
 
