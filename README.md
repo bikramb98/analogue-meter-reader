@@ -17,4 +17,4 @@ A computer vision application that reads analog meter values in real-time using 
 
 ## Configuration
 
-The application uses a configuration file (`config.yaml`) to define the parameters for meter detection. You can customiSe the parameters to improve the accuracy of the meter reading and for different lighting conditions.
+The application uses a configuration file (`config.yaml`) to define the parameters for meter detection. You can customise the parameters to improve the accuracy of the meter reading and for different lighting conditions.
